@@ -4,3 +4,6 @@ build:
 run:
 	@go mod download
 	@go run .
+test:
+	@go mod download
+	go test ./... 
