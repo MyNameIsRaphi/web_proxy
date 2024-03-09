@@ -39,7 +39,6 @@ func main(){
 		}
 		defer conncetion.Close()
 		tlsConnection := tls.Client(conncetion, &tlsConfig)
-		defer tlsConnection.Close()
 		handshake_err := tlsConnection.Handshake()
 		if handshake_err != nil {
 			logrus.WithError(handshake_err).Error("TLS handshake error skipping request")
