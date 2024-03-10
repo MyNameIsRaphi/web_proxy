@@ -1,6 +1,6 @@
 build:
 	@go mod download
-	@go build -o web_server .
+	@go build -o web_proxy .
 run:
 	@go mod download
 	@go run .
