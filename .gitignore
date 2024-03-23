@@ -1,3 +1,6 @@
 key.key
 cert.crt
 web_proxy
+csr.pem
+
+
