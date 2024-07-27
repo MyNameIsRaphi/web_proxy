@@ -1,59 +1,49 @@
 package forward
 
 import (
-	"crypto/tls"
-	"net/http"
 	"io"
-	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/http3"
+	"net"
+	"net/http"
+
+	"errors"
+
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
+func HandleRequest(ctx *gin.Context) {
+	req := *ctx.Request 
 
-type Handler struct {
-	TlsConfig *tls.Config
-
-}
-
-func (h Handler) ServeHTTP(res http.ResponseWriter,req *http.Request) {
-	//TODO forward http request and sent it back
-	var host  string = req.Host
-	var path string = req.URL.Path
 	var method string = req.Method
-
-	logrus.Info("%s\t%s\t%s", method, path, host)
-
-	roundTripper := http3.RoundTripper{
-		TLSClientConfig: h.TlsConfig,
-		QuicConfig: &quic.Config{},
-	}	
-	client := http.Client{Transport: &roundTripper}
-
-	new_res, err := client.Do(req)
-
-	if err != nil {
-		(res).WriteHeader(305)
-		return 
+	if method == "CONNECT" {
+		tunnelRequest(ctx)
 	}
-
-	defer new_res.Body.Close()
-
-	bodyBytes, readErr := io.ReadAll(new_res.Body)
-
-	if readErr != nil {
-		(res).WriteHeader(305)
-		return 
-	}
-
-	_, err = res.Write(bodyBytes)
-
-	if err != nil {
-		(res).WriteHeader(305)
-		return 
-	}
-
-
-
 }
 
+func tunnelRequest(ctx *gin.Context) {
+	destConn, err := net.Dial("tcp", ctx.Request.Host)
+	logrus.Info(ctx.Request.Host)
+	
+	if err != nil {
+		logrus.Error(err)
+		ctx.AbortWithError(http.StatusInternalServerError,err)
+		return 
+	}
+	defer destConn.Close()
+	ctx.Status(http.StatusOK)
+	hijacker, ok := ctx.Writer.(http.Hijacker) // check if writer supports the hijacking interface
+	if !ok {
+		ctx.AbortWithError(http.StatusInternalServerError, errors.New("Hijacking not supported"))
+		return
+	}
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		logrus.Error(err.Error())
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer clientConn.Close()
+	io.Copy(destConn, clientConn)
+
+}
 

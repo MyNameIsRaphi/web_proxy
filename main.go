@@ -2,19 +2,30 @@ package main
 
 import (
 	"fmt"
-	"crypto/tls"
 	"os"
-	"github.com/quic-go/quic-go/http3"
-	"github.com/sirupsen/logrus"
+
+	"sync"
+
 	"github.com/MyNameIsRaphi/web_proxy/forward"
+	"github.com/MyNameIsRaphi/web_proxy/middleware"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 const PORT = 8080
-
+const HTTPS_PORT = 4040
 
 
 
 func main(){
+	var wg sync.WaitGroup
+	wg.Add(1)
 
+	go runHTTPProxy(&wg)	
+	
+	wg.Wait()	
+
+}
+func runHTTPSProxy(wg *sync.WaitGroup){
 	key_path, exists := os.LookupEnv("KEY_PATH")
 	if !exists{
 		logrus.Fatal("Failed to read KEY_PATH")
@@ -23,26 +34,25 @@ func main(){
 	if !exists {
 		logrus.Fatal("Failed to read CERT_PATH")
 	}
-	cert, err := tls.LoadX509KeyPair(cert_path, key_path)
+	//TODO add TLS proxy
+	server := gin.Default()
+	var addr string = fmt.Sprintf(":%d", HTTPS_PORT)
+	server.Use(forward.HandleRequest)
+	err := server.RunTLS(addr, cert_path, key_path)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to inialize tls")
+		logrus.Fatal(err)
 	}
-	var tlsConfig = tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.VerifyClientCertIfGiven}
-	
-	
-	var addr string = fmt.Sprintf(":%d", PORT)
-	handler := forward.Handler{}	
-	handler.TlsConfig = &tlsConfig
+	wg.Done()	
+}
 
-	err = http3.ListenAndServe(addr, cert_path, key_path, handler)	
-
+func runHTTPProxy(wg *sync.WaitGroup) {
+	var err error
+	server := gin.Default()
+	server.Use(middleware.LogRequest, forward.HandleRequest)
+	logrus.Infof("Starting server on port %d", PORT)
+	err = server.Run()
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to start server")
 	}
-
-
-
+	wg.Done()
 }
-
-
-
