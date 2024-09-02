@@ -43,7 +43,16 @@ func tunnelRequest(ctx *gin.Context) {
 		return
 	}
 	defer clientConn.Close()
-	io.Copy(destConn, clientConn)
-
+	// TODO use net/http library
+	go func() {
+		_, err := io.Copy(destConn, clientConn)
+		if err != nil {
+			logrus.Info(err)
+		}
+	}()
+	_, err = io.Copy(clientConn, destConn)		
+	if err != nil {
+		logrus.Info(err)
+	}
 }
 

@@ -6,8 +6,9 @@ import (
 
 	"sync"
 
+	"net/http"
+
 	"github.com/MyNameIsRaphi/web_proxy/forward"
-	"github.com/MyNameIsRaphi/web_proxy/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -46,11 +47,12 @@ func runHTTPSProxy(wg *sync.WaitGroup){
 }
 
 func runHTTPProxy(wg *sync.WaitGroup) {
+	// TODO use net/http library
 	var err error
-	server := gin.Default()
-	server.Use(middleware.LogRequest, forward.HandleRequest)
+	server := http.NewServeMux()
+	server.HandleFunc(forward.HandleRequest)
 	logrus.Infof("Starting server on port %d", PORT)
-	err = server.Run()
+	err = server.ServeHTTP()
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to start server")
 	}
